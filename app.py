@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 
 st.title("Course Evaluation Dashboard")
 
@@ -37,42 +37,90 @@ data = [
 
 df = pd.DataFrame(data)
 
-# ===== FIGUR 5 (klickbar lista istället för stapel-click) =====
+# ===== FIGUR 5: ÖVERSIKT =====
 st.subheader("Overview (Figure 5)")
 
-fig = px.bar(df, x="course", y="prop45",
-             labels={"prop45": "Proportion (4–5)", "course": "Course"})
+fig = go.Figure()
 
-st.plotly_chart(fig, use_container_width=True)
+fig.add_trace(go.Bar(
+    x=df["course"],
+    y=df["prop45"],
+    marker_color="steelblue"
+))
 
-# KLICKBAR!
-selected_course = st.radio(
-    "Select a course to view details:",
-    df["course"].tolist()
+fig.update_layout(
+    title="Proportion of students (4–5)",
+    xaxis_title="Course",
+    yaxis_title="Proportion",
+    clickmode='event+select'
 )
 
-# ===== FIGUR 6 =====
-st.subheader(f"Course profile for {selected_course} (Figure 6)")
+selected = st.plotly_chart(fig, use_container_width=True)
+
+# ===== STATE: vilken kurs är vald =====
+if "selected_course" not in st.session_state:
+    st.session_state.selected_course = df["course"].iloc[0]
+
+# ===== FALLBACK: välj via knapp =====
+selected_course = st.radio(
+    "Select course:",
+    df["course"].tolist(),
+    index=df["course"].tolist().index(st.session_state.selected_course)
+)
+
+st.session_state.selected_course = selected_course
+
+# ===== FIGUR 6: LIKERT =====
+st.subheader(f"Course profile: {selected_course}")
 
 course_data = next(d for d in data if d["course"] == selected_course)
 
 rows = []
 for q, values in course_data["likert"].items():
+    total = sum(values)
+
     rows.append({
         "Question": q,
-        "Low (1–2)": values[0] + values[1],
-        "Mid (3)": values[2],
-        "High (4–5)": values[3] + values[4]
+        "1–2": -(values[0] + values[1]) / total * 100,
+        "3": values[2] / total * 100,
+        "4–5": (values[3] + values[4]) / total * 100
     })
 
 likert_df = pd.DataFrame(rows)
 
-fig2 = px.bar(
-    likert_df,
-    x="Question",
-    y=["Low (1–2)", "Mid (3)", "High (4–5)"],
-    barmode="stack",
-    title="Likert profile"
+# ===== LIKERT SOM I ARTIKELN =====
+fig2 = go.Figure()
+
+fig2.add_trace(go.Bar(
+    y=likert_df["Question"],
+    x=likert_df["1–2"],
+    name="1–2",
+    orientation='h',
+    marker_color="red"
+))
+
+fig2.add_trace(go.Bar(
+    y=likert_df["Question"],
+    x=likert_df["3"],
+    name="3",
+    orientation='h',
+    marker_color="gray"
+))
+
+fig2.add_trace(go.Bar(
+    y=likert_df["Question"],
+    x=likert_df["4–5"],
+    name="4–5",
+    orientation='h',
+    marker_color="green"
+))
+
+fig2.update_layout(
+    barmode='relative',
+    title="Likert profile (%)",
+    xaxis_title="Percentage",
+    yaxis_title="",
 )
 
 st.plotly_chart(fig2, use_container_width=True)
+``
